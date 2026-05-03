@@ -543,9 +543,11 @@
     let currentMusic = "none";
     let effectTimer = 0;
     let resultRevealTimers = [];
+    let isCompactView = false;
 
     function resize() {
-      dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      isCompactView = window.matchMedia("(max-width: 520px)").matches;
+      dpr = isCompactView ? Math.max(1, Math.min(1.5, window.devicePixelRatio || 1)) : 1;
       width = Math.floor(canvas.clientWidth || window.innerWidth);
       height = Math.floor(canvas.clientHeight || window.innerHeight);
       canvas.width = Math.floor(width * dpr);
@@ -819,6 +821,7 @@
     }
 
     function spawnEnemy() {
+      if (game.enemies.length >= 90) return;
       const radius = rand(9, 34);
       const pos = spawnAtEdge(radius);
       const speed = 92 + (34 - radius) * 7.2 + game.elapsed * 1.4;
@@ -834,6 +837,7 @@
     }
 
     function spawnFood() {
+      if (game.foods.length >= 36) return;
       const radius = rand(5, 9);
       const pos = spawnAtEdge(radius);
       const speed = 48 + (9 - radius) * 15 + rand(0, 18);
@@ -849,6 +853,7 @@
     }
 
     function spawnItem(type) {
+      if (game.items.length >= 10) return;
       const colors = {
         slow: "#a7f3ff",
         star: "#ffe66d",
@@ -1106,10 +1111,10 @@
     function drawBackground(elapsed) {
       ctx.clearRect(0, 0, width, height);
       ctx.save();
-      ctx.globalAlpha = 0.28;
+      ctx.globalAlpha = isCompactView ? 0.22 : 0.14;
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 1;
-      const grid = 42;
+      const grid = isCompactView ? 42 : 64;
       for (let x = (elapsed * 12) % grid; x < width; x += grid) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -1148,7 +1153,8 @@
 
     function drawTitleParticles() {
       ctx.save();
-      for (let i = 0; i < 24; i += 1) {
+      const count = isCompactView ? 20 : 12;
+      for (let i = 0; i < count; i += 1) {
         const x = (Math.sin(titleClock * 0.7 + i * 2.4) * 0.5 + 0.5) * width;
         const y = (Math.cos(titleClock * 0.55 + i * 1.7) * 0.5 + 0.5) * height;
         const radius = 7 + (i % 5) * 3;
@@ -1173,8 +1179,10 @@
     function drawFood(food) {
       const glow = Math.sin(game.elapsed * 5 + food.pulse) * 2;
       ctx.save();
-      ctx.shadowColor = "#ffffff";
-      ctx.shadowBlur = 14;
+      if (isCompactView) {
+        ctx.shadowColor = "#ffffff";
+        ctx.shadowBlur = 10;
+      }
       drawCircle(food.x, food.y, food.radius + glow * 0.2, "#ffffff", "rgba(255,255,255,0.45)");
       ctx.restore();
     }
@@ -1186,8 +1194,10 @@
         drawCircle(enemy.x - enemy.vx * 0.055, enemy.y - enemy.vy * 0.055, enemy.radius, "#ef3434");
         ctx.globalAlpha = 1;
       }
-      ctx.shadowColor = "#ff3030";
-      ctx.shadowBlur = 12;
+      if (isCompactView) {
+        ctx.shadowColor = "#ff3030";
+        ctx.shadowBlur = 9;
+      }
       drawCircle(enemy.x, enemy.y, enemy.radius, "#ef3434", "rgba(255, 220, 220, 0.42)", 2);
       ctx.globalAlpha = 0.42;
       drawCircle(enemy.x - enemy.radius * 0.28, enemy.y - enemy.radius * 0.28, enemy.radius * 0.28, "#ff9a9a");
@@ -1204,8 +1214,10 @@
       if (!blinkVisible) {
         ctx.globalAlpha = 0.22;
       }
-      ctx.shadowColor = invincible ? "#ffe66d" : "#69d8ee";
-      ctx.shadowBlur = warningBlink ? 36 : invincible ? 26 : 18;
+      if (isCompactView || invincible) {
+        ctx.shadowColor = invincible ? "#ffe66d" : "#69d8ee";
+        ctx.shadowBlur = warningBlink ? 26 : invincible ? 18 : 10;
+      }
       drawCircle(p.x, p.y, p.radius, invincible ? "#e9f871" : "#69d8ee", "rgba(255,255,255,0.6)", 3);
       drawCircle(p.x - p.radius * 0.28, p.y - p.radius * 0.32, p.radius * 0.22, "rgba(255,255,255,0.42)");
       if (warningBlink) {
@@ -1223,8 +1235,10 @@
       ctx.save();
       ctx.translate(item.x, item.y);
       ctx.rotate(item.spin);
-      ctx.shadowColor = item.color;
-      ctx.shadowBlur = 18;
+      if (isCompactView) {
+        ctx.shadowColor = item.color;
+        ctx.shadowBlur = 12;
+      }
       if (item.type === "star") {
         drawStar(0, 0, 5, 7, 15, item.color);
       } else {
