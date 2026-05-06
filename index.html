@@ -86,10 +86,6 @@
     }
 
     .mobile-pause {
-      position: fixed;
-      right: 14px;
-      bottom: calc(14px + env(safe-area-inset-bottom));
-      z-index: 3;
       display: none;
       min-width: 56px;
       min-height: 44px;
@@ -105,6 +101,33 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .mobile-controls {
+      display: none;
+    }
+
+    .stick {
+      position: relative;
+      width: 86px;
+      height: 86px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 50%;
+      background: rgba(248, 250, 252, 0.1);
+      touch-action: none;
+      backdrop-filter: blur(8px);
+    }
+
+    .stick-nub {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #69d8ee;
+      box-shadow: 0 0 16px rgba(105, 216, 238, 0.55);
+      transform: translate(-50%, -50%);
     }
 
     .hud-row {
@@ -164,7 +187,17 @@
     }
 
     .title-panel {
+      position: relative;
       width: min(620px, 100%);
+    }
+
+    .version-label {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 800;
     }
 
     h1 {
@@ -182,6 +215,7 @@
     p {
       margin: 0;
       color: #cbd5e1;
+      font-size: 14px;
       line-height: 1.7;
     }
 
@@ -191,6 +225,7 @@
       margin: 18px 0 22px;
       text-align: left;
       color: #dbeafe;
+      font-size: 14px;
       line-height: 1.55;
     }
 
@@ -408,13 +443,42 @@
       gap: 10px;
     }
 
-    @media (max-width: 520px) {
+    @media (max-width: 760px) {
+      body {
+        grid-template-rows: 1fr auto;
+        place-items: stretch;
+      }
+
       canvas {
         width: 100vw;
-        height: 100dvh;
+        height: calc(100dvh - 122px - env(safe-area-inset-bottom));
         border: 0;
         border-radius: 0;
         box-shadow: none;
+      }
+
+      .mobile-controls {
+        display: none;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        min-height: calc(122px + env(safe-area-inset-bottom));
+        padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+        background: rgba(3, 7, 18, 0.96);
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .mobile-controls.active {
+        display: grid;
+      }
+
+      .mobile-pause {
+        justify-self: end;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 78px;
+        min-height: 58px;
+        font-size: 20px;
       }
 
       .hud {
@@ -423,13 +487,14 @@
       }
 
       .panel {
-        max-height: calc(100vh - 28px);
+        max-height: calc(100dvh - 20px);
         overflow-y: auto;
-        padding: 20px;
+        padding: 18px;
       }
 
       h1 {
-        font-size: 34px;
+        font-size: 30px;
+        margin-bottom: 10px;
       }
 
       .ranking li {
@@ -438,16 +503,40 @@
       }
 
       .howto {
-        gap: 6px;
-        margin: 14px 0 18px;
+        gap: 5px;
+        margin: 12px 0 16px;
+        font-size: 12px;
+      }
+
+      .howto div {
+        grid-template-columns: 28px 1fr;
+        gap: 7px;
+        padding: 6px 8px;
+      }
+
+      .guide-icon {
+        width: 24px;
+        height: 24px;
         font-size: 14px;
       }
 
-      .pause-hint {
-        left: 14px;
-        transform: none;
-        max-width: calc(100vw - 96px);
+      p {
         font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .version-label {
+        top: 10px;
+        right: 12px;
+        font-size: 11px;
+      }
+
+      .pause-hint {
+        display: none;
+      }
+
+      .pause-hint.active {
+        display: none;
       }
     }
   </style>
@@ -464,23 +553,29 @@
     </div>
   </div>
   <div id="pauseHint" class="pause-hint">SPACEキー / 右下ボタンでPAUSE</div>
-  <button id="mobilePause" class="mobile-pause" type="button" aria-label="PAUSE">Ⅱ</button>
+  <div id="mobileControls" class="mobile-controls" aria-label="mobile controls">
+    <div id="stick" class="stick" aria-label="virtual controller">
+      <div id="stickNub" class="stick-nub"></div>
+    </div>
+    <button id="mobilePause" class="mobile-pause" type="button" aria-label="PAUSE">Ⅱ</button>
+  </div>
 
   <div id="effectText" class="effect-text" aria-live="polite"></div>
   <div id="pauseText" class="pause-text" aria-live="polite">PAUSE</div>
 
   <div id="titleScreen" class="overlay active">
     <div class="panel title-panel">
+      <div class="version-label">Ver：1.2</div>
       <h1>ESCAPE RED</h1>
-      <p>赤い敵を避けながら、白い丸とアイテムを集めてスコアを伸ばそう。</p>
+      <p>赤丸を避けながら、白丸とアイテムを集めてスコアを伸ばそう。</p>
       <div class="howto">
-        <div><span class="guide-icon guide-player"></span><span>マウスで水色の自機を動かします。</span></div>
-        <div><span class="guide-icon guide-food"></span><span>白い丸を取るとスコア加算。小さい白丸ほど速く、自機は少しずつ大きくなります。</span></div>
-        <div><span class="guide-icon guide-clock">◷</span><span>時計は5秒スロー。敵やアイテムの動きが重くなります。</span></div>
-        <div><span class="guide-icon guide-star"></span><span>星は5秒無敵。赤い敵を消してスコアにできます。</span></div>
-        <div><span class="guide-icon guide-bang">!</span><span>！は画面内の敵を全消しします。</span></div>
-        <div><span class="guide-icon guide-reset">R</span><span>Rは自機サイズを初期化します。</span></div>
-        <div><span class="guide-icon guide-enemy"></span><span>赤い敵に当たるとゲームオーバーです。</span></div>
+        <div><span class="guide-icon guide-player"></span><span>マウスや指で水色の自機を動かします。</span></div>
+        <div><span class="guide-icon guide-food"></span><span>取るとスコアを加算し、自機が少しずつ大きくなります。</span></div>
+        <div><span class="guide-icon guide-clock">◷</span><span>取ると5秒間スロー。敵やアイテムの動きが遅くなります。</span></div>
+        <div><span class="guide-icon guide-star"></span><span>取ると5秒間無敵。赤い敵に当たって消してスコアを獲得しよう。</span></div>
+        <div><span class="guide-icon guide-bang">!</span><span>取ると画面内の敵を全消しします。スコアも獲得できます。</span></div>
+        <div><span class="guide-icon guide-reset">R</span><span>取ると自機のサイズを初期化します。</span></div>
+        <div><span class="guide-icon guide-enemy"></span><span>当たるとゲームオーバーです。</span></div>
       </div>
       <button id="start" type="button">スタート</button>
     </div>
@@ -507,7 +602,10 @@
     const ctx = canvas.getContext("2d");
     const hud = document.getElementById("hud");
     const pauseHint = document.getElementById("pauseHint");
+    const mobileControls = document.getElementById("mobileControls");
     const mobilePauseButton = document.getElementById("mobilePause");
+    const stick = document.getElementById("stick");
+    const stickNub = document.getElementById("stickNub");
     const scoreText = document.getElementById("score");
     const timeText = document.getElementById("time");
     const effectText = document.getElementById("effectText");
@@ -554,6 +652,9 @@
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (game) {
+        game.followMouse = isCompactView ? true : game.followMouse;
+        mobileControls.classList.toggle("active", isCompactView && (game.state === "playing" || game.state === "paused"));
+        updateCanvasCursor();
         game.player.x = clamp(game.player.x, game.player.radius, width - game.player.radius);
         game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
       }
@@ -580,6 +681,8 @@
         foods: [],
         items: [],
         pointer: { x: width / 2, y: height / 2, seen: false },
+        followMouse: isCompactView,
+        joystick: { active: false, dx: 0, dy: 0 },
         player: { x: width / 2, y: height / 2, radius: 24, baseRadius: 24 }
       };
     }
@@ -745,9 +848,11 @@
       effectText.classList.remove("active");
       pauseText.classList.remove("active");
       pauseHint.classList.add("active");
+      mobileControls.classList.toggle("active", isCompactView);
       mobilePauseButton.classList.add("active");
       mobilePauseButton.textContent = "Ⅱ";
       game = makeGame();
+      updateCanvasCursor();
       titleScreen.classList.remove("active");
       gameOverOverlay.classList.remove("active");
       hud.classList.add("active");
@@ -762,6 +867,7 @@
       effectText.classList.remove("active");
       pauseText.classList.remove("active");
       pauseHint.classList.remove("active");
+      mobileControls.classList.remove("active");
       mobilePauseButton.classList.remove("active");
       mobilePauseButton.textContent = "Ⅱ";
       titleScreen.classList.add("active");
@@ -770,6 +876,7 @@
       game = null;
       if (audio) startTitleMusic();
       else stopMusic();
+      canvas.style.cursor = "default";
     }
 
     function togglePause() {
@@ -895,8 +1002,14 @@
       const timeScale = slowActive ? 0.42 : 1;
       game.slowFlash = Math.max(0, game.slowFlash - dt);
 
-      game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 18);
-      game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 18);
+      if (isCompactView) {
+        const stickSpeed = 310;
+        game.player.x += game.joystick.dx * stickSpeed * dt;
+        game.player.y += game.joystick.dy * stickSpeed * dt;
+      } else if (game.followMouse) {
+        game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 18);
+        game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 18);
+      }
       game.player.x = clamp(game.player.x, game.player.radius, width - game.player.radius);
       game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
 
@@ -1089,6 +1202,7 @@
       renderRanking(result.top);
       hud.classList.remove("active");
       pauseHint.classList.remove("active");
+      mobileControls.classList.remove("active");
       mobilePauseButton.classList.remove("active");
       gameOverOverlay.classList.add("active");
       resultRevealTimers.push(setTimeout(() => {
@@ -1235,6 +1349,7 @@
       ctx.save();
       ctx.translate(item.x, item.y);
       ctx.rotate(item.spin);
+      ctx.globalAlpha = 0.72 + Math.sin(game.elapsed * 8 + item.age * 2) * 0.22;
       if (isCompactView) {
         ctx.shadowColor = item.color;
         ctx.shadowBlur = 12;
@@ -1323,21 +1438,89 @@
 
     function movePointer(clientX, clientY) {
       if (!game || game.state !== "playing") return;
-      const rect = canvas.getBoundingClientRect();
-      game.pointer.x = clamp(clientX - rect.left, game.player.radius, width - game.player.radius);
-      game.pointer.y = clamp(clientY - rect.top, game.player.radius, height - game.player.radius);
+      if (isCompactView || !game.followMouse) return;
+      const point = getCanvasPoint(clientX, clientY);
+      game.pointer.x = point.x;
+      game.pointer.y = point.y;
       game.pointer.seen = true;
+    }
+
+    function getCanvasPoint(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: clamp(clientX - rect.left, game.player.radius, width - game.player.radius),
+        y: clamp(clientY - rect.top, game.player.radius, height - game.player.radius)
+      };
+    }
+
+    function handleCanvasPointerDown(event) {
+      if (!game || game.state !== "playing" || isCompactView) return;
+      const point = getCanvasPoint(event.clientX, event.clientY);
+      const dx = point.x - game.player.x;
+      const dy = point.y - game.player.y;
+      if (dx * dx + dy * dy > game.player.radius * game.player.radius) return;
+      game.followMouse = !game.followMouse;
+      game.pointer.x = point.x;
+      game.pointer.y = point.y;
+      updateCanvasCursor();
+    }
+
+    function updateCanvasCursor() {
+      if (isCompactView || !game) {
+        canvas.style.cursor = "none";
+      } else {
+        canvas.style.cursor = game.followMouse ? "none" : "crosshair";
+      }
+    }
+
+    function updateStick(clientX, clientY) {
+      if (!game || (game.state !== "playing" && game.state !== "paused")) return;
+      const rect = stick.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const max = rect.width * 0.34;
+      const rawX = clientX - centerX;
+      const rawY = clientY - centerY;
+      const distance = Math.hypot(rawX, rawY);
+      const limited = distance > max ? max / distance : 1;
+      const x = rawX * limited;
+      const y = rawY * limited;
+      game.joystick.dx = x / max;
+      game.joystick.dy = y / max;
+      stickNub.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+    }
+
+    function resetStick() {
+      if (game) {
+        game.joystick.dx = 0;
+        game.joystick.dy = 0;
+        game.joystick.active = false;
+      }
+      stickNub.style.transform = "translate(-50%, -50%)";
     }
 
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", (event) => movePointer(event.clientX, event.clientY));
-    window.addEventListener("pointerdown", (event) => movePointer(event.clientX, event.clientY));
+    canvas.addEventListener("pointerdown", handleCanvasPointerDown);
     window.addEventListener("pointermove", (event) => movePointer(event.clientX, event.clientY));
     window.addEventListener("touchmove", (event) => {
       if (!event.touches.length) return;
       event.preventDefault();
-      movePointer(event.touches[0].clientX, event.touches[0].clientY);
     }, { passive: false });
+    stick.addEventListener("pointerdown", (event) => {
+      if (!isCompactView) return;
+      event.preventDefault();
+      stick.setPointerCapture(event.pointerId);
+      if (game) game.joystick.active = true;
+      updateStick(event.clientX, event.clientY);
+    });
+    stick.addEventListener("pointermove", (event) => {
+      if (!isCompactView || !game || !game.joystick.active) return;
+      event.preventDefault();
+      updateStick(event.clientX, event.clientY);
+    });
+    stick.addEventListener("pointerup", resetStick);
+    stick.addEventListener("pointercancel", resetStick);
     window.addEventListener("keydown", (event) => {
       if (event.code !== "Space") return;
       event.preventDefault();
