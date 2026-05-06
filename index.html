@@ -682,11 +682,12 @@
     let effectTimer = 0;
     let resultRevealTimers = [];
     let isCompactView = false;
+    let suppressTouchUntil = 0;
 
     function resize() {
       document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
       isCompactView = window.matchMedia("(max-width: 760px), (pointer: coarse)").matches;
-      dpr = isCompactView ? Math.max(1, Math.min(1.5, window.devicePixelRatio || 1)) : 1;
+      dpr = 1;
       width = Math.floor(canvas.clientWidth || window.innerWidth);
       height = Math.floor(canvas.clientHeight || window.innerHeight);
       canvas.width = Math.floor(width * dpr);
@@ -903,13 +904,15 @@
     function startInvincibleMusic() {
       stopMusic();
       currentMusic = "invincible";
-      const notes = [784, 988, 1175, 1568, 1175, 988];
+      const notes = [784, 988, 1175, 1568, 1976, 1568, 1175, 988];
       let step = 0;
       bgmTimer = setInterval(() => {
-        playTone(notes[step % notes.length], 0.14, "triangle", 0.055);
-        playTone(notes[(step + 2) % notes.length] * 0.5, 0.18, "sine", 0.03);
+        const note = notes[step % notes.length];
+        playTone(note, 0.11, "square", 0.06);
+        playTone(note * 1.5, 0.08, "triangle", 0.035, 0.03);
+        playTone(notes[(step + 3) % notes.length] * 0.5, 0.16, "sine", 0.028);
         step += 1;
-      }, 145);
+      }, 105);
     }
 
     function startResultMusic() {
@@ -988,14 +991,27 @@
         game.state = "paused";
         pauseText.classList.add("active");
         mobilePauseButton.textContent = "▶";
+        resetInputAfterPause();
         stopMusic();
       } else {
         game.state = "playing";
         pauseText.classList.remove("active");
         mobilePauseButton.textContent = "Ⅱ";
+        resetInputAfterPause();
+        suppressTouchUntil = performance.now() + 300;
         lastTime = performance.now();
-        startGameMusic();
+        if (game.elapsed < game.invincibleUntil) startInvincibleMusic();
+        else if (game.elapsed < game.slowUntil) startSlowMusic();
+        else startGameMusic();
       }
+    }
+
+    function resetInputAfterPause() {
+      resetStick();
+      if (!game) return;
+      game.pointer.x = game.player.x;
+      game.pointer.y = game.player.y;
+      game.pointer.seen = false;
     }
 
     function showEffectText(text) {
@@ -1050,7 +1066,7 @@
     }
 
     function spawnEnemy() {
-      if (game.enemies.length >= 90) return;
+      if (game.enemies.length >= 70) return;
       const radius = rand(9, 34);
       const pos = spawnAtEdge(radius);
       const speed = 92 + (34 - radius) * 7.2 + game.elapsed * 1.4;
@@ -1066,7 +1082,7 @@
     }
 
     function spawnFood() {
-      if (game.foods.length >= 36) return;
+      if (game.foods.length >= 24) return;
       const radius = rand(5, 9);
       const pos = spawnAtEdge(radius);
       const speed = 48 + (9 - radius) * 15 + rand(0, 18);
@@ -1082,7 +1098,7 @@
     }
 
     function spawnItem(type) {
-      if (game.items.length >= 10) return;
+      if (game.items.length >= 8) return;
       const colors = {
         slow: "#a7f3ff",
         star: "#ffe66d",
@@ -1391,10 +1407,10 @@
     function drawBackground(elapsed) {
       ctx.clearRect(0, 0, width, height);
       ctx.save();
-      ctx.globalAlpha = isCompactView ? 0.22 : 0.14;
+      ctx.globalAlpha = isCompactView ? 0.16 : 0.09;
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 1;
-      const grid = isCompactView ? 42 : 64;
+      const grid = isCompactView ? 64 : 86;
       for (let x = (elapsed * 12) % grid; x < width; x += grid) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -1433,7 +1449,7 @@
 
     function drawTitleParticles() {
       ctx.save();
-      const count = isCompactView ? 20 : 12;
+      const count = isCompactView ? 10 : 6;
       for (let i = 0; i < count; i += 1) {
         const x = (Math.sin(titleClock * 0.7 + i * 2.4) * 0.5 + 0.5) * width;
         const y = (Math.cos(titleClock * 0.55 + i * 1.7) * 0.5 + 0.5) * height;
@@ -1459,24 +1475,16 @@
     function drawFood(food) {
       const glow = Math.sin(game.elapsed * 5 + food.pulse) * 2;
       ctx.save();
-      if (isCompactView) {
-        ctx.shadowColor = "#ffffff";
-        ctx.shadowBlur = 10;
-      }
       drawCircle(food.x, food.y, food.radius + glow * 0.2, "#ffffff", "rgba(255,255,255,0.45)");
       ctx.restore();
     }
 
     function drawEnemy(enemy) {
       ctx.save();
-      if (game.elapsed < game.slowUntil) {
+      if (isCompactView && game.elapsed < game.slowUntil) {
         ctx.globalAlpha = 0.22;
         drawCircle(enemy.x - enemy.vx * 0.055, enemy.y - enemy.vy * 0.055, enemy.radius, "#ef3434");
         ctx.globalAlpha = 1;
-      }
-      if (isCompactView) {
-        ctx.shadowColor = "#ff3030";
-        ctx.shadowBlur = 9;
       }
       drawCircle(enemy.x, enemy.y, enemy.radius, "#ef3434", "rgba(255, 220, 220, 0.42)", 2);
       ctx.globalAlpha = 0.42;
@@ -1494,9 +1502,9 @@
       if (!blinkVisible) {
         ctx.globalAlpha = 0.22;
       }
-      if (isCompactView || invincible) {
+      if (invincible) {
         ctx.shadowColor = invincible ? "#ffe66d" : "#69d8ee";
-        ctx.shadowBlur = warningBlink ? 26 : invincible ? 18 : 10;
+        ctx.shadowBlur = warningBlink ? 18 : 12;
       }
       drawCircle(p.x, p.y, p.radius, invincible ? "#e9f871" : "#69d8ee", "rgba(255,255,255,0.6)", 3);
       drawCircle(p.x - p.radius * 0.28, p.y - p.radius * 0.32, p.radius * 0.22, "rgba(255,255,255,0.42)");
@@ -1516,10 +1524,6 @@
       ctx.translate(item.x, item.y);
       ctx.rotate(item.spin);
       ctx.globalAlpha = 0.72 + Math.sin(game.elapsed * 8 + item.age * 2) * 0.22;
-      if (isCompactView) {
-        ctx.shadowColor = item.color;
-        ctx.shadowBlur = 12;
-      }
       if (item.type === "star") {
         drawStar(0, 0, 5, 7, 15, item.color);
       } else {
@@ -1604,6 +1608,7 @@
 
     function movePointer(clientX, clientY) {
       if (!game || game.state !== "playing") return;
+      if (isCompactView && performance.now() < suppressTouchUntil) return;
       if (!isCompactView && !game.followMouse) return;
       const point = getCanvasPoint(clientX, clientY);
       game.pointer.x = point.x;
@@ -1621,6 +1626,7 @@
 
     function handleCanvasPointerDown(event) {
       if (!game || game.state !== "playing") return;
+      if (isCompactView && performance.now() < suppressTouchUntil) return;
       const point = getCanvasPoint(event.clientX, event.clientY);
       if (isCompactView) {
         game.pointer.x = point.x;
@@ -1710,6 +1716,10 @@
       togglePause();
     });
     mobilePauseButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+    mobilePauseButton.addEventListener("pointerup", (event) => event.stopPropagation());
+    mobilePauseButton.addEventListener("pointercancel", (event) => event.stopPropagation());
+    mobilePauseButton.addEventListener("touchstart", (event) => event.stopPropagation(), { passive: true });
+    mobilePauseButton.addEventListener("touchend", (event) => event.stopPropagation(), { passive: true });
     mobileControls.addEventListener("pointermove", (event) => event.stopPropagation());
     window.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("beforeunload", () => {
