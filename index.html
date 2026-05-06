@@ -344,6 +344,25 @@
       display: block;
     }
 
+    .countdown-text {
+      position: fixed;
+      left: 50%;
+      top: 45%;
+      z-index: 3;
+      display: none;
+      transform: translate(-50%, -50%);
+      color: #f8fafc;
+      font-size: clamp(72px, 16vw, 150px);
+      font-weight: 950;
+      letter-spacing: 0;
+      text-shadow: 0 0 30px rgba(105, 216, 238, 0.9), 0 8px 28px rgba(0, 0, 0, 0.85);
+      pointer-events: none;
+    }
+
+    .countdown-text.active {
+      display: block;
+    }
+
     .result-grid {
       display: grid;
       gap: 10px;
@@ -391,6 +410,18 @@
       display: inline-flex;
     }
 
+    .grade-value {
+      font-size: 34px;
+      font-weight: 950;
+      letter-spacing: 0;
+    }
+
+    .grade-d { color: #3b82f6; }
+    .grade-c { color: #67e8f9; }
+    .grade-b { color: #fde047; }
+    .grade-a { color: #ef4444; }
+    .grade-s { color: #f5c542; text-shadow: 0 0 18px rgba(245, 197, 66, 0.55); }
+
     .ranking {
       margin: 16px 0 22px;
       padding: 0;
@@ -400,7 +431,7 @@
 
     .ranking li {
       display: grid;
-      grid-template-columns: 42px 1fr 82px;
+      grid-template-columns: 42px 1fr 64px 82px;
       align-items: center;
       gap: 10px;
       min-height: 34px;
@@ -414,6 +445,11 @@
       justify-items: center;
       color: #94a3b8;
       font-weight: 600;
+    }
+
+    .ranking .grade-value {
+      font-size: 18px;
+      text-align: center;
     }
 
     button {
@@ -498,7 +534,7 @@
       }
 
       .ranking li {
-        grid-template-columns: 34px 1fr 72px;
+        grid-template-columns: 34px 1fr 42px 72px;
         font-size: 14px;
       }
 
@@ -552,7 +588,7 @@
       <span id="invincibleBadge" class="badge">STAR</span>
     </div>
   </div>
-  <div id="pauseHint" class="pause-hint">SPACEキー / 右下ボタンでPAUSE</div>
+  <div id="pauseHint" class="pause-hint">SPACEキーでPAUSE</div>
   <div id="mobileControls" class="mobile-controls" aria-label="mobile controls">
     <div id="stick" class="stick" aria-label="virtual controller">
       <div id="stickNub" class="stick-nub"></div>
@@ -562,10 +598,11 @@
 
   <div id="effectText" class="effect-text" aria-live="polite"></div>
   <div id="pauseText" class="pause-text" aria-live="polite">PAUSE</div>
+  <div id="countdownText" class="countdown-text" aria-live="polite">3</div>
 
   <div id="titleScreen" class="overlay active">
     <div class="panel title-panel">
-      <div class="version-label">Ver:1.21</div>
+      <div class="version-label">ver:1.3</div>
       <h1>ESCAPE RED</h1>
       <p>赤丸を避けながら、白丸とアイテムを集めてスコアを伸ばそう。</p>
       <div class="howto">
@@ -587,6 +624,7 @@
       <div class="result-grid">
         <div class="result-line"><span>経過時間</span><strong id="finalTime" class="result-value"><span id="finalTimeValue">0.0秒</span><span id="newRecord" class="new-record">新記録!</span></strong></div>
         <div class="result-line"><span>スコア</span><strong id="finalScore" class="result-value"><span id="finalScoreValue">0</span></strong></div>
+        <div class="result-line"><span>評価</span><strong id="finalGrade" class="result-value grade-value">D</strong></div>
       </div>
       <h2>ランキング TOP 5</h2>
       <ol id="ranking" class="ranking"></ol>
@@ -610,12 +648,14 @@
     const timeText = document.getElementById("time");
     const effectText = document.getElementById("effectText");
     const pauseText = document.getElementById("pauseText");
+    const countdownText = document.getElementById("countdownText");
     const titleScreen = document.getElementById("titleScreen");
     const gameOverOverlay = document.getElementById("gameOver");
     const finalTimeText = document.getElementById("finalTime");
     const finalTimeValue = document.getElementById("finalTimeValue");
     const finalScoreText = document.getElementById("finalScore");
     const finalScoreValue = document.getElementById("finalScoreValue");
+    const finalGradeText = document.getElementById("finalGrade");
     const newRecordText = document.getElementById("newRecord");
     const rankingList = document.getElementById("ranking");
     const startButton = document.getElementById("start");
@@ -655,6 +695,7 @@
       if (game) {
         game.followMouse = isCompactView ? true : game.followMouse;
         mobileControls.classList.toggle("active", isCompactView && (game.state === "playing" || game.state === "paused"));
+        mobilePauseButton.classList.toggle("active", isCompactView && (game.state === "playing" || game.state === "paused"));
         updateCanvasCursor();
         game.player.x = clamp(game.player.x, game.player.radius, width - game.player.radius);
         game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
@@ -663,7 +704,9 @@
 
     function makeGame() {
       return {
-        state: "playing",
+        state: "countdown",
+        countdown: 3,
+        countdownLast: 4,
         elapsed: 0,
         score: 0,
         enemyTimer: 0,
@@ -817,6 +860,20 @@
       playTone(1046, 0.34, "sine", 0.07, 0.34);
     }
 
+    function playCountdownSe(count) {
+      const freq = count > 0 ? 440 + count * 110 : 880;
+      playTone(freq, 0.12, "square", 0.08);
+      playTone(freq * 1.5, 0.1, "triangle", 0.045, 0.04);
+    }
+
+    function playSGradeSe() {
+      playTone(659, 0.1, "triangle", 0.09);
+      playTone(880, 0.1, "triangle", 0.085, 0.09);
+      playTone(1175, 0.14, "triangle", 0.08, 0.18);
+      playTone(1568, 0.36, "sine", 0.075, 0.34);
+      playNoise(0.22, 0.055);
+    }
+
     function startGameMusic() {
       if (currentMusic === "game") return;
       stopMusic();
@@ -828,6 +885,31 @@
         playTone(notes[(step + 2) % notes.length] * 0.5, 0.22, "triangle", 0.025);
         step += 1;
       }, 180);
+    }
+
+    function startSlowMusic() {
+      if (currentMusic === "slow") return;
+      stopMusic();
+      currentMusic = "slow";
+      const notes = [165, 196, 247, 294, 247, 196];
+      let step = 0;
+      bgmTimer = setInterval(() => {
+        playTone(notes[step % notes.length], 0.34, "triangle", 0.035);
+        playTone(notes[(step + 2) % notes.length] * 0.5, 0.46, "sine", 0.024);
+        step += 1;
+      }, 420);
+    }
+
+    function startInvincibleMusic() {
+      stopMusic();
+      currentMusic = "invincible";
+      const notes = [784, 988, 1175, 1568, 1175, 988];
+      let step = 0;
+      bgmTimer = setInterval(() => {
+        playTone(notes[step % notes.length], 0.14, "triangle", 0.055);
+        playTone(notes[(step + 2) % notes.length] * 0.5, 0.18, "sine", 0.03);
+        step += 1;
+      }, 145);
     }
 
     function startResultMusic() {
@@ -842,17 +924,33 @@
       }, 420);
     }
 
+    function startSGradeMusic() {
+      stopMusic();
+      currentMusic = "s-grade";
+      const notes = [523, 659, 784, 1046, 1318, 1046, 784, 659];
+      let step = 0;
+      resultTimer = setInterval(() => {
+        playTone(notes[step % notes.length], 0.24, "triangle", 0.06);
+        playTone(notes[(step + 3) % notes.length] * 0.5, 0.36, "sine", 0.035);
+        step += 1;
+      }, 260);
+    }
+
     function startGame() {
       getAudio();
+      stopMusic();
       clearResultRevealTimers();
       clearTimeout(effectTimer);
       effectText.classList.remove("active");
       pauseText.classList.remove("active");
+      countdownText.classList.add("active");
+      countdownText.textContent = "3";
       pauseHint.classList.add("active");
       mobileControls.classList.toggle("active", isCompactView);
-      mobilePauseButton.classList.add("active");
+      mobilePauseButton.classList.toggle("active", isCompactView);
       mobilePauseButton.textContent = "Ⅱ";
       game = makeGame();
+      playCountdownSe(3);
       if (isCompactView) {
         game.pointer.x = game.player.x;
         game.pointer.y = game.player.y;
@@ -862,7 +960,6 @@
       gameOverOverlay.classList.remove("active");
       hud.classList.add("active");
       lastTime = performance.now();
-      startGameMusic();
     }
 
     function showTitle() {
@@ -871,6 +968,7 @@
       clearTimeout(effectTimer);
       effectText.classList.remove("active");
       pauseText.classList.remove("active");
+      countdownText.classList.remove("active");
       pauseHint.classList.remove("active");
       mobileControls.classList.remove("active");
       mobilePauseButton.classList.remove("active");
@@ -914,7 +1012,26 @@
       resultRevealTimers = [];
       finalTimeText.classList.remove("revealed");
       finalScoreText.classList.remove("revealed");
+      finalGradeText.classList.remove("revealed");
       newRecordText.classList.remove("active");
+    }
+
+    function updatePlayerMovement(dt) {
+      if (isCompactView) {
+        if (game.joystick.active) {
+          const stickSpeed = 470;
+          game.player.x += game.joystick.dx * stickSpeed * dt;
+          game.player.y += game.joystick.dy * stickSpeed * dt;
+        } else {
+          game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 34);
+          game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 34);
+        }
+      } else if (game.followMouse) {
+        game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 18);
+        game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 18);
+      }
+      game.player.x = clamp(game.player.x, game.player.radius, width - game.player.radius);
+      game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
     }
 
     function spawnAtEdge(radius) {
@@ -996,7 +1113,29 @@
     }
 
     function update(dt) {
-      if (!game || game.state !== "playing") return;
+      if (!game) return;
+      if (game.state === "countdown") {
+        updatePlayerMovement(dt);
+        game.countdown -= dt;
+        const count = Math.ceil(game.countdown);
+        countdownText.textContent = count > 0 ? String(count) : "GO!";
+        if (count !== game.countdownLast) {
+          game.countdownLast = count;
+          playCountdownSe(Math.max(0, count));
+        }
+        if (game.countdown <= -0.35) {
+          game.state = "playing";
+          countdownText.classList.remove("active");
+          game.elapsed = 0;
+          game.score = 0;
+          game.enemyTimer = 0;
+          game.foodTimer = 0;
+          lastTime = performance.now();
+          startGameMusic();
+        }
+        return;
+      }
+      if (game.state !== "playing") return;
 
       game.elapsed += dt;
       game.score += dt * 6;
@@ -1006,22 +1145,10 @@
       const invincibleActive = game.elapsed < game.invincibleUntil;
       const timeScale = slowActive ? 0.42 : 1;
       game.slowFlash = Math.max(0, game.slowFlash - dt);
+      if (slowActive && currentMusic === "game") startSlowMusic();
+      if (!slowActive && currentMusic === "slow") startGameMusic();
 
-      if (isCompactView) {
-        if (game.joystick.active) {
-          const stickSpeed = 310;
-          game.player.x += game.joystick.dx * stickSpeed * dt;
-          game.player.y += game.joystick.dy * stickSpeed * dt;
-        } else {
-          game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 18);
-          game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 18);
-        }
-      } else if (game.followMouse) {
-        game.player.x += (game.pointer.x - game.player.x) * Math.min(1, dt * 18);
-        game.player.y += (game.pointer.y - game.player.y) * Math.min(1, dt * 18);
-      }
-      game.player.x = clamp(game.player.x, game.player.radius, width - game.player.radius);
-      game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
+      updatePlayerMovement(dt);
 
       game.enemyTimer -= dt;
       const enemyInterval = clamp(0.82 - game.elapsed * 0.006, 0.22, 0.82);
@@ -1081,6 +1208,10 @@
       timeText.textContent = `${game.elapsed.toFixed(1)}秒`;
       slowBadge.classList.toggle("active", slowActive);
       invincibleBadge.classList.toggle("active", invincibleActive);
+      if (currentMusic === "invincible" && !invincibleActive) {
+        if (slowActive) startSlowMusic();
+        else startGameMusic();
+      }
     }
 
     function applyTimeBonus() {
@@ -1138,6 +1269,7 @@
           game.invincibleUntil = game.elapsed + 5;
           showEffectText("INVINCIBLE");
           playStarSe();
+          startInvincibleMusic();
         } else if (item.type === "clear") {
           const clearBonus = game.enemies.length * 100;
           game.score += clearBonus;
@@ -1192,11 +1324,15 @@
         const item = document.createElement("li");
         const rank = document.createElement("span");
         const detail = document.createElement("span");
+        const grade = document.createElement("span");
         const score = document.createElement("span");
+        const gradeValue = getGrade(record.score || 0);
         rank.textContent = `${index + 1}位`;
         detail.textContent = `${record.elapsed.toFixed(1)}秒`;
+        grade.textContent = gradeValue;
+        grade.className = `grade-value grade-${gradeValue.toLowerCase()}`;
         score.textContent = record.score.toLocaleString("ja-JP");
-        item.append(rank, detail, score);
+        item.append(rank, detail, grade, score);
         rankingList.appendChild(item);
       });
     }
@@ -1207,8 +1343,11 @@
       playHitSe();
       clearResultRevealTimers();
       const result = saveRanking(game.score, game.elapsed);
+      const grade = getGrade(Math.floor(game.score));
       finalTimeValue.textContent = `${game.elapsed.toFixed(1)}秒`;
       finalScoreValue.textContent = Math.floor(game.score).toLocaleString("ja-JP");
+      finalGradeText.textContent = grade;
+      finalGradeText.className = `result-value grade-value grade-${grade.toLowerCase()}`;
       renderRanking(result.top);
       hud.classList.remove("active");
       pauseHint.classList.remove("active");
@@ -1224,12 +1363,29 @@
         playResultImpactSe();
       }, 900));
       resultRevealTimers.push(setTimeout(() => {
+        finalGradeText.classList.add("revealed");
+        playResultImpactSe();
+      }, 1120));
+      resultRevealTimers.push(setTimeout(() => {
         if (result.isNewRecord) {
           newRecordText.classList.add("active");
           playNewRecordSe();
         }
-        startResultMusic();
-      }, 1320));
+        if (grade === "S") {
+          playSGradeSe();
+          startSGradeMusic();
+        } else {
+          startResultMusic();
+        }
+      }, 1520));
+    }
+
+    function getGrade(score) {
+      if (score >= 10000) return "S";
+      if (score >= 6000) return "A";
+      if (score >= 4000) return "B";
+      if (score >= 2000) return "C";
+      return "D";
     }
 
     function drawBackground(elapsed) {
@@ -1518,7 +1674,10 @@
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", (event) => movePointer(event.clientX, event.clientY));
     canvas.addEventListener("pointerdown", handleCanvasPointerDown);
-    window.addEventListener("pointermove", (event) => movePointer(event.clientX, event.clientY));
+    window.addEventListener("pointermove", (event) => {
+      if (isCompactView && event.target !== canvas) return;
+      movePointer(event.clientX, event.clientY);
+    });
     window.addEventListener("touchmove", (event) => {
       if (!event.touches.length) return;
       event.preventDefault();
@@ -1547,8 +1706,11 @@
     backTitleButton.addEventListener("click", showTitle);
     mobilePauseButton.addEventListener("click", (event) => {
       event.preventDefault();
+      event.stopPropagation();
       togglePause();
     });
+    mobilePauseButton.addEventListener("pointerdown", (event) => event.stopPropagation());
+    mobileControls.addEventListener("pointermove", (event) => event.stopPropagation());
     window.addEventListener("contextmenu", (event) => event.preventDefault());
     window.addEventListener("beforeunload", () => {
       cancelAnimationFrame(rafId);
