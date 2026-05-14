@@ -379,6 +379,12 @@
       color: #071016;
     }
 
+    .guide-double {
+      background: #f8fafc;
+      color: #071016;
+      font-size: 12px;
+    }
+
     .guide-enemy {
       background: #ef3434;
       color: #ef3434;
@@ -387,13 +393,13 @@
     .effect-text {
       position: fixed;
       left: 50%;
-      top: 54%;
+      top: 62%;
       z-index: 3;
       transform: translate(-50%, -50%) scale(0.9);
       opacity: 0;
       pointer-events: none;
       color: #f8fafc;
-      font-size: clamp(28px, 6vw, 58px);
+      font-size: clamp(24px, 5vw, 46px);
       font-weight: 950;
       letter-spacing: 0;
       text-align: center;
@@ -709,7 +715,7 @@
 
   <div id="titleScreen" class="overlay active">
     <div class="panel title-panel">
-      <div class="version-label">ver1.52</div>
+      <div class="version-label">ver1.6</div>
       <h1>ESCAPE RED</h1>
       <div class="lang-row">
         <button id="englishButton" class="lang-button" type="button">ENGLISH</button>
@@ -727,6 +733,7 @@
         <div><span class="guide-icon guide-star"></span><span>取ると5秒間無敵。赤い敵に当たって消してスコアを獲得しよう。</span></div>
         <div><span class="guide-icon guide-bang">!</span><span>取ると画面内の敵を全消しします。スコアも獲得できます。</span></div>
         <div><span class="guide-icon guide-reset">R</span><span>取ると自機のサイズを初期化します。</span></div>
+        <div><span class="guide-icon guide-double">x2</span><span>x2アイコンを取ると10秒間すべてのスコアが2倍加算されます。</span></div>
         <div><span class="guide-icon guide-enemy"></span><span>当たるとゲームオーバーです。</span></div>
       </div>
       <button id="start" type="button">スタート</button>
@@ -737,7 +744,7 @@
     <div class="panel">
       <h1>RESULT</h1>
       <div class="result-grid">
-        <div class="result-line"><span>経過時間</span><strong id="finalTime" class="result-value"><span id="finalTimeValue">0.0秒</span><span id="newRecord" class="new-record">新記録!</span></strong></div>
+        <div class="result-line"><span>生存時間</span><strong id="finalTime" class="result-value"><span id="finalTimeValue">0.0秒</span><span id="newRecord" class="new-record">新記録!</span></strong></div>
         <div class="result-line"><span>スコア</span><strong id="finalScore" class="result-value"><span id="finalScoreValue">0</span></strong></div>
         <div class="result-line"><span>モード</span><strong id="finalMode" class="result-value">NORMAL</strong></div>
         <div class="result-line"><span>評価</span><strong id="finalGrade" class="result-value grade-value">D</strong></div>
@@ -802,9 +809,10 @@
         howStar: "星を取ると5秒間無敵になります。赤い敵を消してスコアにできます。",
         howClear: "！を取ると画面内の敵を消します。スコアも獲得できます。",
         howReset: "Rを取ると自機のサイズが初期化されます。",
+        howDouble: "x2アイコンを取ると10秒間すべてのスコアが2倍加算されます。",
         howEnemy: "赤い丸に当たるとゲームオーバーです。",
         start: "スタート",
-        elapsed: "経過時間",
+        elapsed: "生存時間",
         grade: "評価",
         mode: "モード",
         ranking: "ランキング TOP 5",
@@ -821,6 +829,7 @@
         invincibleEffect: "無敵",
         clearEffect: "全消し",
         resetEffect: "サイズリセット",
+        doubleEffect: "スコア2倍",
         bonus30: "30秒経過ボーナス!",
         bonusTime: "経過ボーナス!",
         minute: "分",
@@ -838,6 +847,7 @@
         howStar: "Collecting the star makes you invincible for 5 seconds. You can erase red enemies for score.",
         howClear: "Collecting ! erases all enemies on screen and awards score.",
         howReset: "Collecting R resets your player size.",
+        howDouble: "Collecting the x2 icon doubles all score gains for 10 seconds.",
         howEnemy: "Touching a red circle causes game over.",
         start: "Start",
         elapsed: "Time",
@@ -857,6 +867,7 @@
         invincibleEffect: "INVINCIBLE",
         clearEffect: "ALL CLEAR",
         resetEffect: "SIZE RESET",
+        doubleEffect: "SCORE x2",
         bonus30: "30 Second Bonus!",
         bonusTime: "Time Bonus!",
         minute: "min",
@@ -917,12 +928,14 @@
         foodTimer: 0,
         itemTimers: {
           slow: rand(5, 9),
-          star: rand(12, 20),
-          clear: rand(8, 13),
-          reset: rand(24, 38)
+        star: rand(12, 20),
+        clear: rand(8, 13),
+          reset: rand(24, 38),
+          double: rand(14, 24)
         },
         slowUntil: 0,
         invincibleUntil: 0,
+        doubleScoreUntil: 0,
         slowFlash: 0,
         mode: currentMode,
         hardActivated: currentMode !== "hard",
@@ -1294,7 +1307,7 @@
       const titleLead = titleScreen.querySelector("p");
       if (titleLead) titleLead.textContent = tr("titleLead");
       const howtoTexts = titleScreen.querySelectorAll(".howto span:last-child");
-      const howtoKeys = ["howPlayer", "howFood", "howSlow", "howStar", "howClear", "howReset", "howEnemy"];
+      const howtoKeys = ["howPlayer", "howFood", "howSlow", "howStar", "howClear", "howReset", "howDouble", "howEnemy"];
       howtoTexts.forEach((node, index) => {
         node.textContent = tr(howtoKeys[index]);
       });
@@ -1346,6 +1359,11 @@
       game.player.y = clamp(game.player.y, game.player.radius, height - game.player.radius);
     }
 
+    function addScore(amount) {
+      const multiplier = game && game.elapsed < game.doubleScoreUntil ? 2 : 1;
+      game.score += amount * multiplier;
+    }
+
     function spawnAtEdge(radius) {
       const side = Math.floor(rand(0, 4));
       if (side === 0) return { x: rand(0, width), y: -radius };
@@ -1355,7 +1373,7 @@
     }
 
     function velocityTowardScreen(pos, speed, wobble = 0.45) {
-      if (game && game.hardActivated) speed *= 1.3;
+      if (game && game.hardActivated) speed *= 1.5;
       const targetX = rand(width * 0.15, width * 0.85);
       const targetY = rand(height * 0.15, height * 0.85);
       const angle = Math.atan2(targetY - pos.y, targetX - pos.x) + rand(-wobble, wobble);
@@ -1400,7 +1418,8 @@
         slow: "#a7f3ff",
         star: "#ffe66d",
         clear: "#ff7a7a",
-        reset: "#d6fb8e"
+        reset: "#d6fb8e",
+        double: "#ffffff"
       };
       const radius = 15;
       const pos = spawnAtEdge(radius);
@@ -1453,7 +1472,7 @@
       if (game.state !== "playing") return;
 
       game.elapsed += dt;
-      game.score += dt * 6;
+      addScore(dt * 6);
       applyTimeBonus();
       updateHardMode();
 
@@ -1483,6 +1502,7 @@
       updateItemTimer("star", dt, 19, 30);
       updateItemTimer("clear", dt, 10, 16);
       updateItemTimer("reset", dt, 45, 68);
+      updateItemTimer("double", dt, 16, 26);
 
       for (const enemy of game.enemies) {
         enemy.x += enemy.vx * dt * timeScale;
@@ -1511,7 +1531,7 @@
         const enemy = game.enemies[i];
         if (!circleHit(game.player, enemy)) continue;
         if (invincibleActive) {
-          game.score += enemy.score;
+          addScore(enemy.score);
           playInvincibleHitSe();
           game.enemies.splice(i, 1);
         } else {
@@ -1539,22 +1559,22 @@
       playTone(180, 0.18, "sawtooth", 0.12);
       playTone(120, 0.28, "square", 0.08, 0.18);
       for (const enemy of game.enemies) {
-        enemy.vx *= 1.3;
-        enemy.vy *= 1.3;
+        enemy.vx *= 1.5;
+        enemy.vy *= 1.5;
       }
       for (const item of game.items) {
-        item.vx *= 1.3;
-        item.vy *= 1.3;
+        item.vx *= 1.5;
+        item.vy *= 1.5;
       }
     }
 
     function applyTimeBonus() {
       while (game.elapsed >= game.nextBonusTime && game.nextBonusTime <= 3600) {
         if (game.nextBonusTime === 30) {
-          game.score += 500;
+          addScore(500);
           showEffectText(`${tr("bonus30")} +500`);
         } else {
-          game.score += 1000;
+          addScore(1000);
           showEffectText(`${formatBonusTime(game.nextBonusTime)}${tr("bonusTime")} +1000`);
         }
         playBonusSe();
@@ -1584,7 +1604,7 @@
       for (let i = game.foods.length - 1; i >= 0; i -= 1) {
         const food = game.foods[i];
         if (!circleHit(game.player, food)) continue;
-        game.score += 100;
+        addScore(100);
         game.player.radius = Math.min(58, game.player.radius + 0.9);
         playFoodSe();
         game.foods.splice(i, 1);
@@ -1607,7 +1627,7 @@
           startInvincibleMusic();
         } else if (item.type === "clear") {
           const clearBonus = game.enemies.length * 100;
-          game.score += clearBonus;
+          addScore(clearBonus);
           game.enemies = [];
           showEffectText(`${tr("clearEffect")} +${clearBonus}`);
           playClearSe();
@@ -1615,8 +1635,12 @@
           game.player.radius = game.player.baseRadius;
           showEffectText(tr("resetEffect"));
           playItemSe();
+        } else if (item.type === "double") {
+          game.doubleScoreUntil = game.elapsed + 10;
+          showEffectText(tr("doubleEffect"));
+          playItemSe();
         }
-        game.score += 150;
+        addScore(150);
         game.items.splice(i, 1);
       }
     }
@@ -1885,6 +1909,7 @@
         if (item.type === "slow") drawClock();
         if (item.type === "clear") ctx.fillText("!", 0, 1);
         if (item.type === "reset") ctx.fillText("R", 0, 1);
+        if (item.type === "double") ctx.fillText("x2", 0, 1);
       }
       ctx.restore();
     }
