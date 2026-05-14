@@ -755,7 +755,7 @@
         retry: "もう一度",
         title: "タイトル画面",
         resultTitle: "結果",
-        pause: "一時停止",
+        pause: "PAUSE",
         slowBadge: "スロー",
         starBadge: "無敵",
         noRecords: "まだ記録がありません",
@@ -826,6 +826,8 @@
     let resultRevealTimers = [];
     let isCompactView = false;
     let suppressTouchUntil = 0;
+    const warningAudio = new Audio("SOUND/WARNING.mp3");
+    warningAudio.preload = "auto";
 
     function resize() {
       document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
@@ -940,6 +942,11 @@
       source.connect(gain);
       gain.connect(audio.destination);
       source.start();
+    }
+
+    function playWarningAudio() {
+      warningAudio.currentTime = 0;
+      warningAudio.play().catch(() => {});
     }
 
     function playItemSe() {
@@ -1444,7 +1451,7 @@
       if (game.mode !== "hard" || game.hardActivated || game.elapsed < 10) return;
       game.hardActivated = true;
       game.warningUntil = game.elapsed + 2.2;
-      showEffectText(tr("warning"));
+      playWarningAudio();
       playNoise(0.24, 0.16);
       playTone(180, 0.18, "sawtooth", 0.12);
       playTone(120, 0.28, "square", 0.08, 0.18);
@@ -1770,7 +1777,7 @@
       ctx.save();
       ctx.translate(item.x, item.y);
       ctx.rotate(item.spin);
-      ctx.globalAlpha = 0.72 + Math.sin(game.elapsed * 8 + item.age * 2) * 0.22;
+      ctx.globalAlpha = 0.28 + ((Math.sin(game.elapsed * 13 + item.age * 4) + 1) / 2) * 0.72;
       if (item.type === "star") {
         drawStar(0, 0, 5, 7, 15, item.color);
       } else {
