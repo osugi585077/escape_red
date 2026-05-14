@@ -62,6 +62,33 @@
       display: grid;
     }
 
+    .mode-badge {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 3;
+      display: none;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(8, 11, 18, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-weight: 950;
+      letter-spacing: 0;
+      backdrop-filter: blur(8px);
+    }
+
+    .mode-badge.active {
+      display: block;
+    }
+
+    .mode-badge.normal {
+      color: #69d8ee;
+    }
+
+    .mode-badge.hard {
+      color: #ef4444;
+    }
+
     .pause-hint {
       position: fixed;
       left: 50%;
@@ -315,7 +342,7 @@
     .guide-food {
       width: 18px;
       height: 18px;
-      margin-left: 5px;
+      margin-left: 1px;
       background: #ffffff;
       color: #ffffff;
     }
@@ -476,6 +503,16 @@
     .grade-b { color: #fde047; }
     .grade-a { color: #ef4444; }
     .grade-s { color: #f5c542; text-shadow: 0 0 18px rgba(245, 197, 66, 0.55); }
+
+    #finalMode.normal {
+      color: #69d8ee;
+      font-weight: 950;
+    }
+
+    #finalMode.hard {
+      color: #ef4444;
+      font-weight: 950;
+    }
 
     .ranking {
       margin: 16px 0 22px;
@@ -643,6 +680,7 @@
       <span id="invincibleBadge" class="badge">STAR</span>
     </div>
   </div>
+  <div id="modeBadge" class="mode-badge">NORMAL</div>
   <div id="pauseHint" class="pause-hint">SPACEキーでPAUSE</div>
   <div id="mobileControls" class="mobile-controls" aria-label="mobile controls">
     <div id="stick" class="stick" aria-label="virtual controller">
@@ -657,7 +695,7 @@
 
   <div id="titleScreen" class="overlay active">
     <div class="panel title-panel">
-      <div class="version-label">ver1.5</div>
+      <div class="version-label">ver1.52</div>
       <h1>ESCAPE RED</h1>
       <div class="lang-row">
         <button id="englishButton" class="lang-button" type="button">ENGLISH</button>
@@ -687,6 +725,7 @@
       <div class="result-grid">
         <div class="result-line"><span>経過時間</span><strong id="finalTime" class="result-value"><span id="finalTimeValue">0.0秒</span><span id="newRecord" class="new-record">新記録!</span></strong></div>
         <div class="result-line"><span>スコア</span><strong id="finalScore" class="result-value"><span id="finalScoreValue">0</span></strong></div>
+        <div class="result-line"><span>モード</span><strong id="finalMode" class="result-value">NORMAL</strong></div>
         <div class="result-line"><span>評価</span><strong id="finalGrade" class="result-value grade-value">D</strong></div>
       </div>
       <h2>ランキング TOP 5</h2>
@@ -702,6 +741,7 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const hud = document.getElementById("hud");
+    const modeBadge = document.getElementById("modeBadge");
     const pauseHint = document.getElementById("pauseHint");
     const mobileControls = document.getElementById("mobileControls");
     const mobilePauseButton = document.getElementById("mobilePause");
@@ -718,6 +758,7 @@
     const finalTimeValue = document.getElementById("finalTimeValue");
     const finalScoreText = document.getElementById("finalScore");
     const finalScoreValue = document.getElementById("finalScoreValue");
+    const finalModeText = document.getElementById("finalMode");
     const finalGradeText = document.getElementById("finalGrade");
     const newRecordText = document.getElementById("newRecord");
     const rankingList = document.getElementById("ranking");
@@ -751,6 +792,7 @@
         start: "スタート",
         elapsed: "経過時間",
         grade: "評価",
+        mode: "モード",
         ranking: "ランキング TOP 5",
         retry: "もう一度",
         title: "タイトル画面",
@@ -786,6 +828,7 @@
         start: "Start",
         elapsed: "Time",
         grade: "Grade",
+        mode: "Mode",
         ranking: "Top 5 Ranking",
         retry: "Try Again",
         title: "Title Screen",
@@ -826,6 +869,7 @@
     let resultRevealTimers = [];
     let isCompactView = false;
     let suppressTouchUntil = 0;
+    let touchDragActive = false;
     const warningAudio = new Audio("SOUND/WARNING.mp3");
     warningAudio.preload = "auto";
 
@@ -944,9 +988,21 @@
       source.start();
     }
 
+    function playModeSelectSe() {
+      playTone(620, 0.06, "triangle", 0.06);
+      playTone(930, 0.08, "sine", 0.045, 0.04);
+    }
+
+    function playWarningFallbackSe() {
+      playNoise(0.38, 0.2);
+      playTone(150, 0.24, "sawtooth", 0.14);
+      playTone(90, 0.44, "square", 0.08, 0.14);
+    }
+
     function playWarningAudio() {
       warningAudio.currentTime = 0;
       warningAudio.play().catch(() => {});
+      playWarningFallbackSe();
     }
 
     function playItemSe() {
@@ -1105,6 +1161,8 @@
       mobileControls.classList.toggle("active", isCompactView);
       mobilePauseButton.classList.toggle("active", isCompactView);
       mobilePauseButton.textContent = "Ⅱ";
+      modeBadge.textContent = currentMode.toUpperCase();
+      modeBadge.className = `mode-badge active ${currentMode}`;
       game = makeGame();
       playCountdownSe(3);
       if (isCompactView) {
@@ -1126,6 +1184,7 @@
       pauseText.classList.remove("active");
       countdownText.classList.remove("active");
       pauseHint.classList.remove("active");
+      modeBadge.classList.remove("active");
       mobileControls.classList.remove("active");
       mobilePauseButton.classList.remove("active");
       mobilePauseButton.textContent = "Ⅱ";
@@ -1161,6 +1220,7 @@
 
     function resetInputAfterPause() {
       resetStick();
+      touchDragActive = false;
       if (!game) return;
       game.pointer.x = game.player.x;
       game.pointer.y = game.player.y;
@@ -1181,6 +1241,7 @@
       resultRevealTimers = [];
       finalTimeText.classList.remove("revealed");
       finalScoreText.classList.remove("revealed");
+      finalModeText.classList.remove("revealed");
       finalGradeText.classList.remove("revealed");
       newRecordText.classList.remove("active");
     }
@@ -1196,8 +1257,14 @@
     }
 
     function setMode(mode) {
+      getAudio();
       currentMode = mode === "hard" ? "hard" : "normal";
       localStorage.setItem(MODE_KEY, currentMode);
+      updateModeButtons();
+      playModeSelectSe();
+    }
+
+    function updateModeButtons() {
       normalButton.classList.toggle("active", currentMode === "normal");
       hardButton.classList.toggle("active", currentMode === "hard");
     }
@@ -1224,19 +1291,21 @@
       const resultLabels = gameOverOverlay.querySelectorAll(".result-line > span");
       if (resultLabels[0]) resultLabels[0].textContent = tr("elapsed");
       if (resultLabels[1]) resultLabels[1].textContent = tr("score");
-      if (resultLabels[2]) resultLabels[2].textContent = tr("grade");
+      if (resultLabels[2]) resultLabels[2].textContent = tr("mode");
+      if (resultLabels[3]) resultLabels[3].textContent = tr("grade");
       const rankingTitle = gameOverOverlay.querySelector("h2");
       if (rankingTitle) rankingTitle.textContent = tr("ranking");
       const resultTitle = gameOverOverlay.querySelector("h1");
       if (resultTitle) resultTitle.textContent = tr("resultTitle");
       englishButton.classList.toggle("active", currentLang === "en");
       japaneseButton.classList.toggle("active", currentLang === "ja");
-      setMode(currentMode);
+      updateModeButtons();
       if (game) {
         scoreText.textContent = Math.floor(game.score).toLocaleString(currentLang === "ja" ? "ja-JP" : "en-US");
         timeText.textContent = formatSeconds(game.elapsed);
         finalTimeValue.textContent = formatSeconds(game.elapsed);
         finalScoreValue.textContent = Math.floor(game.score).toLocaleString(currentLang === "ja" ? "ja-JP" : "en-US");
+        finalModeText.textContent = game.mode.toUpperCase();
       }
       renderRanking(loadRanking());
     }
@@ -1598,6 +1667,8 @@
       const grade = getGrade(Math.floor(game.score));
       finalTimeValue.textContent = formatSeconds(game.elapsed);
       finalScoreValue.textContent = Math.floor(game.score).toLocaleString(currentLang === "ja" ? "ja-JP" : "en-US");
+      finalModeText.textContent = game.mode.toUpperCase();
+      finalModeText.className = `result-value ${game.mode}`;
       finalGradeText.textContent = grade;
       finalGradeText.className = `result-value grade-value grade-${grade.toLowerCase()}`;
       renderRanking(result.top);
@@ -1605,6 +1676,7 @@
       pauseHint.classList.remove("active");
       mobileControls.classList.remove("active");
       mobilePauseButton.classList.remove("active");
+      modeBadge.classList.remove("active");
       gameOverOverlay.classList.add("active");
       resultRevealTimers.push(setTimeout(() => {
         finalTimeText.classList.add("revealed");
@@ -1615,9 +1687,13 @@
         playResultImpactSe();
       }, 900));
       resultRevealTimers.push(setTimeout(() => {
-        finalGradeText.classList.add("revealed");
+        finalModeText.classList.add("revealed");
         playResultImpactSe();
       }, 1120));
+      resultRevealTimers.push(setTimeout(() => {
+        finalGradeText.classList.add("revealed");
+        playResultImpactSe();
+      }, 1320));
       resultRevealTimers.push(setTimeout(() => {
         if (result.isNewRecord) {
           newRecordText.classList.add("active");
@@ -1629,7 +1705,7 @@
         } else {
           startResultMusic();
         }
-      }, 1520));
+      }, 1720));
     }
 
     function getGrade(score) {
@@ -1863,6 +1939,7 @@
     function movePointer(clientX, clientY) {
       if (!game || game.state !== "playing") return;
       if (isCompactView && performance.now() < suppressTouchUntil) return;
+      if (isCompactView && !touchDragActive) return;
       if (!isCompactView && !game.followMouse) return;
       const point = getCanvasPoint(clientX, clientY);
       game.pointer.x = point.x;
@@ -1883,6 +1960,11 @@
       if (isCompactView && performance.now() < suppressTouchUntil) return;
       const point = getCanvasPoint(event.clientX, event.clientY);
       if (isCompactView) {
+        const dx = point.x - game.player.x;
+        const dy = point.y - game.player.y;
+        if (dx * dx + dy * dy > (game.player.radius * 1.8) ** 2) return;
+        touchDragActive = true;
+        canvas.setPointerCapture(event.pointerId);
         game.pointer.x = point.x;
         game.pointer.y = point.y;
         game.pointer.seen = true;
@@ -1895,6 +1977,13 @@
       game.pointer.x = point.x;
       game.pointer.y = point.y;
       updateCanvasCursor();
+    }
+
+    function stopTouchDrag() {
+      touchDragActive = false;
+      if (!game) return;
+      game.pointer.x = game.player.x;
+      game.pointer.y = game.player.y;
     }
 
     function updateCanvasCursor() {
@@ -1936,6 +2025,8 @@
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", (event) => movePointer(event.clientX, event.clientY));
     canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+    canvas.addEventListener("pointerup", stopTouchDrag);
+    canvas.addEventListener("pointercancel", stopTouchDrag);
     window.addEventListener("pointermove", (event) => {
       if (isCompactView && event.target !== canvas) return;
       movePointer(event.clientX, event.clientY);
