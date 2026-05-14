@@ -222,6 +222,38 @@
       color: #071016;
     }
 
+    .mode-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 0 12px;
+    }
+
+    .mode-button {
+      min-width: 108px;
+      min-height: 38px;
+      border: 2px solid transparent;
+      color: #071016;
+      font-size: 14px;
+      font-weight: 950;
+      opacity: 0.68;
+    }
+
+    .mode-button.normal {
+      background: #69d8ee;
+    }
+
+    .mode-button.hard {
+      background: #ef4444;
+      color: #fff7f7;
+    }
+
+    .mode-button.active {
+      opacity: 1;
+      border-color: #ffffff;
+      box-shadow: 0 0 18px rgba(255, 255, 255, 0.24);
+    }
+
     h1 {
       margin: 0 0 16px;
       font-size: 46px;
@@ -338,6 +370,7 @@
       font-weight: 950;
       letter-spacing: 0;
       text-align: center;
+      white-space: nowrap;
       text-shadow: 0 0 22px rgba(105, 216, 238, 0.8), 0 4px 18px rgba(0, 0, 0, 0.75);
       transition: opacity 160ms ease, transform 160ms ease;
     }
@@ -624,11 +657,15 @@
 
   <div id="titleScreen" class="overlay active">
     <div class="panel title-panel">
-      <div class="version-label">ver:1.4</div>
+      <div class="version-label">ver1.5</div>
       <h1>ESCAPE RED</h1>
       <div class="lang-row">
         <button id="englishButton" class="lang-button" type="button">ENGLISH</button>
         <button id="japaneseButton" class="lang-button" type="button">日本語</button>
+      </div>
+      <div class="mode-row">
+        <button id="normalButton" class="mode-button normal active" type="button">NORMAL</button>
+        <button id="hardButton" class="mode-button hard" type="button">HARD</button>
       </div>
       <p>赤丸を避けながら、白丸とアイテムを集めてスコアを伸ばそう。</p>
       <div class="howto">
@@ -689,11 +726,14 @@
     const backTitleButton = document.getElementById("backTitle");
     const englishButton = document.getElementById("englishButton");
     const japaneseButton = document.getElementById("japaneseButton");
+    const normalButton = document.getElementById("normalButton");
+    const hardButton = document.getElementById("hardButton");
     const slowBadge = document.getElementById("slowBadge");
     const invincibleBadge = document.getElementById("invincibleBadge");
 
     const RANKING_KEY = "escape-red-ranking";
     const LANG_KEY = "escape-red-language";
+    const MODE_KEY = "escape-red-mode";
     const translations = {
       ja: {
         score: "スコア",
@@ -721,6 +761,7 @@
         noRecords: "まだ記録がありません",
         newRecord: "新記録!",
         slowEffect: "スローモーション",
+        warning: "WARNING",
         invincibleEffect: "無敵",
         clearEffect: "全消し",
         resetEffect: "サイズリセット",
@@ -755,6 +796,7 @@
         noRecords: "No records yet",
         newRecord: "New Record!",
         slowEffect: "SLOW MOTION",
+        warning: "WARNING",
         invincibleEffect: "INVINCIBLE",
         clearEffect: "ALL CLEAR",
         resetEffect: "SIZE RESET",
@@ -765,6 +807,7 @@
       }
     };
     let currentLang = localStorage.getItem(LANG_KEY) === "en" ? "en" : "ja";
+    let currentMode = localStorage.getItem(MODE_KEY) === "hard" ? "hard" : "normal";
     const rand = (min, max) => Math.random() * (max - min) + min;
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -821,6 +864,9 @@
         slowUntil: 0,
         invincibleUntil: 0,
         slowFlash: 0,
+        mode: currentMode,
+        hardActivated: currentMode !== "hard",
+        warningUntil: 0,
         nextBonusTime: 30,
         enemies: [],
         foods: [],
@@ -1142,6 +1188,13 @@
       updateLanguageText();
     }
 
+    function setMode(mode) {
+      currentMode = mode === "hard" ? "hard" : "normal";
+      localStorage.setItem(MODE_KEY, currentMode);
+      normalButton.classList.toggle("active", currentMode === "normal");
+      hardButton.classList.toggle("active", currentMode === "hard");
+    }
+
     function updateLanguageText() {
       const hudLabels = hud.querySelectorAll(".hud-row span:first-child");
       if (hudLabels[0]) hudLabels[0].textContent = tr("score");
@@ -1171,6 +1224,7 @@
       if (resultTitle) resultTitle.textContent = tr("resultTitle");
       englishButton.classList.toggle("active", currentLang === "en");
       japaneseButton.classList.toggle("active", currentLang === "ja");
+      setMode(currentMode);
       if (game) {
         scoreText.textContent = Math.floor(game.score).toLocaleString(currentLang === "ja" ? "ja-JP" : "en-US");
         timeText.textContent = formatSeconds(game.elapsed);
@@ -1211,6 +1265,7 @@
     }
 
     function velocityTowardScreen(pos, speed, wobble = 0.45) {
+      if (game && game.hardActivated) speed *= 1.3;
       const targetX = rand(width * 0.15, width * 0.85);
       const targetY = rand(height * 0.15, height * 0.85);
       const angle = Math.atan2(targetY - pos.y, targetX - pos.x) + rand(-wobble, wobble);
@@ -1310,6 +1365,7 @@
       game.elapsed += dt;
       game.score += dt * 6;
       applyTimeBonus();
+      updateHardMode();
 
       const slowActive = game.elapsed < game.slowUntil;
       const invincibleActive = game.elapsed < game.invincibleUntil;
@@ -1381,6 +1437,24 @@
       if (currentMusic === "invincible" && !invincibleActive) {
         if (slowActive) startSlowMusic();
         else startGameMusic();
+      }
+    }
+
+    function updateHardMode() {
+      if (game.mode !== "hard" || game.hardActivated || game.elapsed < 10) return;
+      game.hardActivated = true;
+      game.warningUntil = game.elapsed + 2.2;
+      showEffectText(tr("warning"));
+      playNoise(0.24, 0.16);
+      playTone(180, 0.18, "sawtooth", 0.12);
+      playTone(120, 0.28, "square", 0.08, 0.18);
+      for (const enemy of game.enemies) {
+        enemy.vx *= 1.3;
+        enemy.vy *= 1.3;
+      }
+      for (const item of game.items) {
+        item.vx *= 1.3;
+        item.vy *= 1.3;
       }
     }
 
@@ -1593,6 +1667,7 @@
       for (const enemy of game.enemies) drawEnemy(enemy);
       drawPlayer();
       if (game.state === "playing" && game.elapsed < game.slowUntil) drawSlowMotionEffect();
+      if (game.state === "playing" && game.elapsed < game.warningUntil) drawWarningEffect();
       if (game.state === "paused") {
         ctx.save();
         ctx.globalAlpha = 0.38;
@@ -1631,6 +1706,23 @@
       const glow = Math.sin(game.elapsed * 5 + food.pulse) * 2;
       ctx.save();
       drawCircle(food.x, food.y, food.radius + glow * 0.2, "#ffffff", "rgba(255,255,255,0.45)");
+      ctx.restore();
+    }
+
+    function drawWarningEffect() {
+      const flash = Math.floor(game.elapsed * 10) % 2 === 0;
+      ctx.save();
+      ctx.globalAlpha = flash ? 0.28 : 0.08;
+      ctx.fillStyle = "#ef3434";
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "#fff7f7";
+      ctx.font = "950 54px Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "#ef3434";
+      ctx.shadowBlur = 22;
+      ctx.fillText(tr("warning"), width / 2, height * 0.42);
       ctx.restore();
     }
 
@@ -1869,6 +1961,8 @@
     backTitleButton.addEventListener("click", showTitle);
     englishButton.addEventListener("click", () => setLanguage("en"));
     japaneseButton.addEventListener("click", () => setLanguage("ja"));
+    normalButton.addEventListener("click", () => setMode("normal"));
+    hardButton.addEventListener("click", () => setMode("hard"));
     mobilePauseButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
